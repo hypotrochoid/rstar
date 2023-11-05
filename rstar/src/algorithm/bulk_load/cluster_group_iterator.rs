@@ -1,4 +1,4 @@
-use crate::{Envelope, Point, RTreeObject, RTreeParams};
+use crate::{Envelope, RTreeObject, RTreeParams};
 
 use alloc::vec::Vec;
 
