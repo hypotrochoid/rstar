@@ -150,7 +150,7 @@ where
         let mut max_diff = (Zero::zero(), Zero::zero(), 0); // diff, min, index
         let mut result = P::new();
 
-        for i in 0..P::DIMENSIONS {
+        for i in 0..point.dimensions() {
             let mut min = l.nth(i);
             let mut max = u.nth(i);
             max = max * max;

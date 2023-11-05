@@ -15,6 +15,7 @@ use criterion::Criterion;
 const SEED_1: &[u8; 32] = b"Gv0aHMtHkBGsUXNspGU9fLRuCWkZWHZx";
 const SEED_2: &[u8; 32] = b"km7DO4GeaFZfTcDXVpnO7ZJlgUY7hZiS";
 
+#[derive(Clone)]
 struct Params;
 
 impl RTreeParams for Params {
@@ -78,6 +79,42 @@ fn tree_creation_quality(c: &mut Criterion) {
     });
 }
 
+fn nearest_neighbor_speed(c: &mut Criterion) {
+    const SIZE: usize = 100_000;
+    let neighborhood_sizes = [1, 2, 4, 8, 16, 32, 64, 128];
+    let points: Vec<_> = create_random_points(SIZE, SEED_1);
+    let tree = RTree::<_, Params>::bulk_load_with_params(points.clone());
+
+    let query_points = create_random_points(100, SEED_2);
+    let mut effect_observer = 0_f64;
+    for sz in neighborhood_sizes.iter() {
+        let query_points_cloned_1 = query_points.clone();
+        let query_points_cloned_2 = query_points.clone();
+
+        let tree_cloned_1 = tree.clone();
+        let tree_cloned_2 = tree.clone();
+
+
+        c.bench_function(format!("stack k-nearest neighbor: {}", sz).as_str(), move |b| {
+            b.iter(|| {
+                for query_point in &query_points_cloned_1 {
+                    let mut iter = tree_cloned_1.k_nearest_neighbor_iter_with_distance_2(  query_point, *sz as usize);
+                    effect_observer = iter.fold(0_f64, |acc, (v, d) | acc + d);
+                }
+            })
+        });
+        c.bench_function(format!("heap k-nearest neighbor: {}", sz).as_str(), move |b| {
+                b.iter(|| {
+                    for query_point in &query_points_cloned_2 {
+                        let mut iter = tree_cloned_2.nearest_neighbor_iter_with_distance_2(  query_point );
+                        effect_observer = iter.take(*sz as usize).fold(0_f64, |acc, (v, d) | acc + d);
+                    }
+                })
+        });
+    }
+}
+
+
 fn locate_successful(c: &mut Criterion) {
     let points: Vec<_> = create_random_points(100_000, SEED_1);
     let query_point = points[500];
@@ -102,7 +139,8 @@ criterion_group!(
     bulk_load_comparison,
     tree_creation_quality,
     locate_successful,
-    locate_unsuccessful
+    locate_unsuccessful,
+    nearest_neighbor_speed
 );
 criterion_main!(benches);
 

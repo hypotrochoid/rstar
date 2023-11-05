@@ -295,7 +295,7 @@ where
     let mut best_axis = 0;
     let min_size = Params::MIN_SIZE;
     let until = node.children.len() - min_size + 1;
-    for axis in 0..<T::Envelope as Envelope>::Point::DIMENSIONS {
+    for axis in 0..node.envelope.center().dimensions() {
         // Sort children along the current axis
         T::Envelope::sort_envelopes(axis, &mut node.children);
         let mut first_envelope = T::Envelope::new_empty();

@@ -161,7 +161,7 @@ pub trait Point: Copy + Clone + PartialEq + Debug {
     type Scalar: RTreeNum;
 
     /// The number of dimensions of this point type.
-    const DIMENSIONS: usize;
+    fn dimensions(&self) -> usize;
 
     /// Creates a new point value with given values for each dimension.
     ///
@@ -204,7 +204,7 @@ pub trait PointExt: Point {
         mut f: impl FnMut(Self::Scalar, Self::Scalar) -> bool,
     ) -> bool {
         // TODO: Maybe do this by proper iteration
-        for i in 0..Self::DIMENSIONS {
+        for i in 0..self.dimensions() {
             if !f(self.nth(i), other.nth(i)) {
                 return false;
             }
@@ -228,7 +228,7 @@ pub trait PointExt: Point {
     fn fold<T>(&self, start_value: T, mut f: impl FnMut(T, Self::Scalar) -> T) -> T {
         let mut accumulated = start_value;
         // TODO: Maybe do this by proper iteration
-        for i in 0..Self::DIMENSIONS {
+        for i in 0..self.dimensions() {
             accumulated = f(accumulated, self.nth(i));
         }
         accumulated
@@ -318,7 +318,7 @@ macro_rules! implement_point_for_array {
         {
             type Scalar = S;
 
-            const DIMENSIONS: usize = count_exprs!($($index),*);
+            fn dimensions(&self) -> usize { count_exprs!($($index),*) }
 
             fn generate(mut generator: impl FnMut(usize) -> S) -> Self
             {
@@ -361,7 +361,7 @@ macro_rules! impl_point_for_tuple {
         {
             type Scalar = S;
 
-            const DIMENSIONS: usize = count_exprs!($($index),*);
+            fn dimensions(&self) -> usize { count_exprs!($($index),*)}
 
             fn generate(mut generator: impl FnMut(usize) -> S) -> Self {
                 ($(generator($index),)+)

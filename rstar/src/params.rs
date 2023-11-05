@@ -87,7 +87,7 @@ pub trait InsertionStrategy {
         T: RTreeObject;
 }
 
-pub fn verify_parameters<T: RTreeObject, P: RTreeParams>() {
+pub fn verify_parameters<T: RTreeObject, P: RTreeParams>(point: Option<&T>) {
     assert!(
         P::MAX_SIZE >= 4,
         "MAX_SIZE too small. Must be larger than 4."
@@ -108,9 +108,11 @@ pub fn verify_parameters<T: RTreeObject, P: RTreeParams>() {
         max_reinsertion_count
     );
 
-    let dimension = <T::Envelope as Envelope>::Point::DIMENSIONS;
-    assert!(
-        dimension > 1,
-        "Point dimension too small - must be at least 2"
-    );
+    if let Some(p) = point {
+        let dimension = p.envelope().center().dimensions();
+        assert!(
+            dimension > 1,
+            "Point dimension too small - must be at least 2"
+        );
+    }
 }

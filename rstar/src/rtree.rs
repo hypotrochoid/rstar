@@ -2,7 +2,7 @@ use crate::algorithm::bulk_load;
 use crate::algorithm::intersection_iterator::IntersectionIterator;
 use crate::algorithm::iterators::*;
 use crate::algorithm::nearest_neighbor;
-use crate::algorithm::nearest_neighbor::NearestNeighborDistance2Iterator;
+use crate::algorithm::nearest_neighbor::{KNearestNeighborDistance2Iterator, NearestNeighborDistance2Iterator};
 use crate::algorithm::nearest_neighbor::NearestNeighborIterator;
 use crate::algorithm::removal;
 use crate::algorithm::removal::DrainIterator;
@@ -223,7 +223,7 @@ where
     /// The tree's compile time parameters must be specified. Refer to the
     /// [RTreeParams] trait for more information and a usage example.
     pub fn new_with_params() -> Self {
-        verify_parameters::<T, Params>();
+        verify_parameters::<T, Params>(None);
         RTree {
             root: ParentNode::new_root::<Params>(),
             size: 0,
@@ -236,6 +236,10 @@ where
     /// For more information refer to [RTree::bulk_load]
     /// and [RTreeParams].
     pub fn bulk_load_with_params(elements: Vec<T>) -> Self {
+        if elements.len() > 0 {
+            verify_parameters::<T, Params>(Some(&elements[0]));
+        }
+
         Self::new_from_bulk_loading(elements, bulk_load::bulk_load_sequential::<_, Params>)
     }
 
@@ -448,7 +452,10 @@ where
         elements: Vec<T>,
         root_loader: impl Fn(Vec<T>) -> ParentNode<T>,
     ) -> Self {
-        verify_parameters::<T, Params>();
+        if elements.len() > 0 {
+            verify_parameters::<T, Params>(Some(&elements[0]));
+        }
+
         let size = elements.len();
         let root = if size == 0 {
             ParentNode::new_root::<Params>()
@@ -767,6 +774,18 @@ where
         query_point: &<T::Envelope as Envelope>::Point,
     ) -> NearestNeighborDistance2Iterator<T> {
         nearest_neighbor::NearestNeighborDistance2Iterator::new(&self.root, *query_point)
+    }
+
+    /// Returns `(element, distance^2)` tuples of the tree sorted by their distance to a given point.
+    ///
+    /// The distance is calculated by calling
+    /// [PointDistance::distance_2].
+    pub fn k_nearest_neighbor_iter_with_distance_2(
+        &self,
+        query_point: &<T::Envelope as Envelope>::Point,
+        num_points: usize,
+    ) -> KNearestNeighborDistance2Iterator<T> {
+        nearest_neighbor::KNearestNeighborDistance2Iterator::new(&self.root, *query_point, num_points)
     }
 
     /// Removes the nearest neighbor for a given point and returns it.

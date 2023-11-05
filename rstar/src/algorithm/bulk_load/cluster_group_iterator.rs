@@ -47,7 +47,7 @@ impl<T: RTreeObject> Iterator for ClusterGroupIterator<T> {
 /// Calculates the desired number of clusters on any axis
 ///
 /// A 'cluster' refers to a set of elements that will finally form an rtree node.
-pub fn calculate_number_of_clusters_on_axis<T, Params>(number_of_elements: usize) -> usize
+pub fn calculate_number_of_clusters_on_axis<T, Params>(number_of_elements: usize, dimension: usize) -> usize
 where
     T: RTreeObject,
     Params: RTreeParams,
@@ -60,7 +60,7 @@ where
     // How many clusters will this node contain
     let number_of_clusters = (number_of_elements as f32 / n_subtree).ceil();
 
-    let max_dimension = <T::Envelope as Envelope>::Point::DIMENSIONS as f32;
+    let max_dimension = dimension as f32;
     // Try to split all clusters among all dimensions as evenly as possible by taking the nth root.
     number_of_clusters.powf(1. / max_dimension).ceil() as usize
 }

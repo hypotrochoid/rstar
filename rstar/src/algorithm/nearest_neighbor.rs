@@ -5,6 +5,7 @@ use crate::{Envelope, PointDistance, RTreeObject};
 use alloc::{collections::BinaryHeap, vec, vec::Vec};
 use heapless::binary_heap as static_heap;
 use num_traits::Bounded;
+use smallvec::SmallVec;
 
 struct RTreeNodeDistanceWrapper<'a, T>
 where
@@ -139,6 +140,135 @@ where
 {
     iter: NearestNeighborDistance2Iterator<'a, T>,
 }
+
+
+
+
+
+
+
+
+
+impl<'a, T> KNearestNeighborDistance2Iterator<'a, T>
+    where
+        T: PointDistance,
+{
+    pub fn new(root: &'a ParentNode<T>, query_point: <T::Envelope as Envelope>::Point, capacity: usize) -> Self {
+        let mut result = KNearestNeighborDistance2Iterator {
+            nodes: SmallVec::with_capacity(capacity),
+            query_point,
+            offset: 0,
+            capacity
+        };
+        result.populate(&root.children);
+        result
+    }
+
+    fn furthest_distance(&self) -> Option<<<T::Envelope as Envelope>::Point as Point>::Scalar> {
+        // if we haven't filled the buffer, the distance is irrelevant
+        if self.nodes.len() == self.capacity {
+            return Some(self.nodes[self.nodes.len() - 1].1)
+        }
+
+        None
+    }
+
+    fn insert(&mut self, node: &'a T, distance: <<T::Envelope as Envelope>::Point as Point>::Scalar) {
+        // index of the first node which is further than the provided one
+        let insertion_point = self.nodes.partition_point(|&x| x.1 <= distance);
+        if self.nodes.len() >= self.capacity {
+            self.nodes.pop();
+        }
+        self.nodes.insert(insertion_point, ( node, distance));
+    }
+
+    fn populate(&mut self, children: &'a [RTreeNode<T>]) {
+        for child in children.iter() {
+            let furthest = self.furthest_distance();
+
+            match child {
+                RTreeNode::Parent(ref data) => {
+                    let child_distance = data.envelope.distance_2(&self.query_point);
+                    if furthest.is_none() || (child_distance < furthest.unwrap()) {
+                        self.populate(data.children());
+                    }
+                },
+                RTreeNode::Leaf(ref t) => {
+                    let child_distance = t.distance_2(&self.query_point);
+                    if furthest.is_none() || (child_distance < furthest.unwrap()) {
+                        self.insert(t, child_distance);
+                    }
+                },
+            };
+        };
+    }
+}
+
+impl<'a, T> Iterator for KNearestNeighborDistance2Iterator<'a, T>
+    where
+        T: PointDistance,
+{
+    type Item = (&'a T, <<T::Envelope as Envelope>::Point as Point>::Scalar);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset < self.nodes.len() {
+            let node = self.nodes[self.offset];
+            self.offset += 1;
+            return Some(node)
+        }
+
+        None
+    }
+}
+
+pub struct KNearestNeighborDistance2Iterator<'a, T>
+    where
+        T: PointDistance + 'a,
+{
+    nodes: SmallVec<[(&'a T, <<T::Envelope as Envelope>::Point as Point>::Scalar);128]>,
+    query_point: <T::Envelope as Envelope>::Point,
+    offset: usize,
+    capacity: usize,
+}
+
+impl<'a, T> KNearestNeighborIterator<'a, T>
+    where
+        T: PointDistance,
+{
+    pub fn new(root: &'a ParentNode<T>, query_point: <T::Envelope as Envelope>::Point, capacity: usize) -> Self {
+        KNearestNeighborIterator {
+            iter: KNearestNeighborDistance2Iterator::new(root, query_point, capacity),
+        }
+    }
+}
+
+impl<'a, T> Iterator for KNearestNeighborIterator<'a, T>
+    where
+        T: PointDistance,
+{
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(t, _distance)| t)
+    }
+}
+
+pub struct KNearestNeighborIterator<'a, T>
+    where
+        T: PointDistance + 'a,
+{
+    iter: KNearestNeighborDistance2Iterator<'a, T>,
+}
+
+
+
+
+
+
+
+
+
+
 
 enum SmallHeap<T: Ord> {
     Stack(static_heap::BinaryHeap<T, static_heap::Max, 32>),
@@ -276,6 +406,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use alloc::vec::Vec;
     use crate::object::PointDistance;
     use crate::rtree::RTree;
     use crate::test_utilities::*;
@@ -365,4 +496,26 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_k_nearest_neighbor_iterator_with_distance_2() {
+        let points = create_random_points(1000, SEED_2);
+        let tree = RTree::bulk_load(points.clone());
+
+        let sample_points = create_random_points(50, SEED_1);
+        for sample_point in &sample_points {
+            let k_iter = tree.k_nearest_neighbor_iter_with_distance_2(&sample_point, 16);
+            let vanilla_iter = tree.nearest_neighbor_iter_with_distance_2(&sample_point);
+
+            let mut n_pts = 0;
+            for (k_value, vanilla_value) in k_iter.zip(vanilla_iter) {
+                n_pts += 1;
+
+                assert_eq!(k_value, vanilla_value);
+            }
+
+            assert_eq!(n_pts, 16);
+        }
+    }
+
 }
