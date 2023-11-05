@@ -168,7 +168,7 @@ pub trait Point: Clone + PartialEq + Debug {
     /// The value that each dimension should be initialized with is given by the parameter `generator`.
     /// Calling `generator(n)` returns the value of dimension `n`, `n` will be in the range `0 .. Self::DIMENSIONS`,
     /// and will be called with values of `n` in ascending order.
-    fn generate(generator: impl FnMut(usize) -> Self::Scalar) -> Self;
+    fn generate(generator: impl FnMut(usize) -> Option<Self::Scalar>) -> Self;
 
     /// Returns a single coordinate of this point.
     ///
@@ -194,7 +194,7 @@ pub trait PointExt: Point {
         other: &Self,
         mut f: impl FnMut(Self::Scalar, Self::Scalar) -> Self::Scalar,
     ) -> Self {
-        Self::generate(|i| f(self.nth(i), other.nth(i)))
+        Self::generate(|i| Some(f(self.nth(i), other.nth(i))))
     }
 
     /// Returns whether all pairs of components of `self` and `other` pass test closure `f`. Short circuits if any result is false.
@@ -236,7 +236,7 @@ pub trait PointExt: Point {
 
     /// Returns a Point with every component set to `value`.
     fn from_value(value: Self::Scalar) -> Self {
-        Self::generate(|_| value)
+        Self::generate(|_| Some(value))
     }
 
     /// Returns a Point with each component set to the smallest of each component pair of `self` and `other`.
@@ -271,7 +271,7 @@ pub trait PointExt: Point {
 
     /// Applies `f` to `self` component wise.
     fn map(&self, mut f: impl FnMut(Self::Scalar) -> Self::Scalar) -> Self {
-        Self::generate(|i| f(self.nth(i)))
+        Self::generate(|i| Some(f(self.nth(i))))
     }
 
     /// Returns the squared distance between `self` and `other`.
@@ -320,9 +320,9 @@ macro_rules! implement_point_for_array {
 
             fn dimensions(&self) -> usize { count_exprs!($($index),*) }
 
-            fn generate(mut generator: impl FnMut(usize) -> S) -> Self
+            fn generate(mut generator: impl FnMut(usize) -> Option<S>) -> Self
             {
-                [$(generator($index)),*]
+                [$(generator($index).unwrap()),*]
             }
 
             #[inline]
@@ -363,8 +363,8 @@ macro_rules! impl_point_for_tuple {
 
             fn dimensions(&self) -> usize { count_exprs!($($index),*)}
 
-            fn generate(mut generator: impl FnMut(usize) -> S) -> Self {
-                ($(generator($index),)+)
+            fn generate(mut generator: impl FnMut(usize) -> Option<S>) -> Self {
+                ($(generator($index).unwrap(),)+)
             }
 
             #[inline]
