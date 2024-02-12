@@ -1,5 +1,5 @@
-use num_traits::{Bounded, Num, Signed, Zero};
 use core::fmt::Debug;
+use num_traits::{Bounded, Num, Signed, Zero};
 
 /// Defines a number type that is compatible with rstar.
 ///
@@ -194,7 +194,13 @@ pub trait PointExt: Point {
         other: &Self,
         mut f: impl FnMut(Self::Scalar, Self::Scalar) -> Self::Scalar,
     ) -> Self {
-        Self::generate(|i| Some(f(self.nth(i), other.nth(i))))
+        Self::generate(|i| {
+            if i < self.dimensions() {
+                Some(f(self.nth(i), other.nth(i)))
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns whether all pairs of components of `self` and `other` pass test closure `f`. Short circuits if any result is false.
@@ -271,7 +277,13 @@ pub trait PointExt: Point {
 
     /// Applies `f` to `self` component wise.
     fn map(&self, mut f: impl FnMut(Self::Scalar) -> Self::Scalar) -> Self {
-        Self::generate(|i| Some(f(self.nth(i))))
+        Self::generate(|i| {
+            if i < self.dimensions() {
+                Some(f(self.nth(i)))
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns the squared distance between `self` and `other`.
